@@ -1288,10 +1288,24 @@ at the top of the `poke-maps-stack' stack."
 
 ;;;; poke-settings
 
+(defvar poke-setting-endian "big")
 (defvar poke-setting-pretty-print "no")
 (defvar poke-setting-omode "plain")
 (defvar poke-setting-omaps "no")
 (defvar poke-setting-obase 10)
+(defvar poke-setting-oindent 2)
+
+(defun poke-setting-set-oindent (val)
+  (unless (>= val 0)
+    (error "Invalid indentation step.  Must be a positive integer."))
+  (poke-code-send (concat "vm_set_oindent (" (number-to-string val) ");")))
+
+(defun poke-setting-set-endian (val)
+  (let ((endian-const (pcase val
+                        ("big" "ENDIAN_BIG")
+                        ("little" "ENDIAN_LITTLE")
+                        (_ (error "Invalid setting for byte endianness.  Expected \"big\" or \"little\".")))))
+    (poke-code-send (concat "set_endian (" endian-const ");"))))
 
 (defun poke-setting-set-pretty-print (val)
   (unless (member val '("yes" "no"))
@@ -1326,7 +1340,9 @@ Expected 2, 8, 10 or 16."))
 
 (defun poke-init-settings ()
   (poke-setting-set-pretty-print poke-setting-pretty-print)
-  (poke-setting-set-omode poke-setting-omode))
+  (poke-setting-set-omode poke-setting-omode)
+  (poke-setting-set-endian poke-setting-endian)
+  (poke-setting-set-oindent poke-setting-oindent))
 
 (defvar poke-settings-map
   (let ((map (make-sparse-keymap)))
@@ -1339,6 +1355,14 @@ Expected 2, 8, 10 or 16."))
   (let ((inhibit-read-only t))
     (erase-buffer))
   (remove-overlays)
+  (widget-insert "Byte endianness:\n")
+  (widget-create 'radio-button-choice
+                 :value poke-setting-endian
+                 :notify (lambda (widget &rest _)
+                           (poke-setting-set-endian (widget-value widget))
+                           (setq poke-setting-endian (widget-value widget)))
+                 '(item "little") '(item "big"))
+  (widget-insert "\n")
   (widget-insert "Output mode:\n")
   (widget-create 'radio-button-choice
                  :value poke-setting-omode
@@ -1371,6 +1395,16 @@ Expected 2, 8, 10 or 16."))
                            (setq poke-setting-omaps (widget-value widget)))
                  '(item "yes") '(item "no"))
   (widget-insert "\n")
+  (widget-insert "Indentation step:\n")
+  (widget-create 'integer
+                 :size 2
+                 :value poke-setting-oindent
+                 :action (lambda (widget &rest _)
+                           (poke-setting-set-oindent (widget-value widget))
+                           (setq poke-setting-oindent (widget-value widget))))
+  (widget-insert "\n")
+  ;; XXX oacutoff
+  ;; XXX odepth
   (use-local-map poke-settings-map)
   (widget-setup))
 
@@ -1380,7 +1414,8 @@ Expected 2, 8, 10 or 16."))
     (unless buf
       (setq buf (get-buffer-create "*poke-settings*"))
       (with-current-buffer buf
-        (poke-settings-create-widgets))))
+        (poke-settings-create-widgets)
+        (goto-char (point-min)))))
   (when and-display
     (switch-to-buffer-other-window "*poke-settings*")))
 
