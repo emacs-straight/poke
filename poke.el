@@ -1,12 +1,12 @@
 ;;; poke.el --- Emacs meets GNU poke!  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022  Free Software Foundation, Inc.
+;; Copyright (C) 2022, 2023  Free Software Foundation, Inc.
 
 ;; Author: Jose E. Marchesi <jemarch@gnu.org>
 ;; Maintainer: Jose E. Marchesi <jemarch@gnu.org>
 ;; URL: https://www.jemarch.net/poke
 ;; Package-Requires: ((emacs "25"))
-;; Version: 2.1
+;; Version: 3.0
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -222,7 +222,7 @@ following attributes in its alist:
      (process-put proc 'pokelet-msg-handler msg-handler)
      (set-process-query-on-exit-flag proc nil)
      (set-process-filter proc #'poke-pokelet-filter)
-     (set-process-filter-multibyte proc nil)
+     (set-process-coding-system proc 'binary 'binary)
      (process-send-string proc ctrl)
      proc))
 
@@ -439,16 +439,9 @@ following attributes in its alist:
 
 (defun poke-vu-handle-cmd (proc cmd data)
   (pcase cmd
-    (1 ;; CLEAR
-     (when (buffer-live-p (process-buffer proc))
-       (with-current-buffer (process-buffer proc)
-         (let ((inhibit-read-only t))
-           (setq-local poke-vu-cur-pos (point))
-           (delete-region (point-min) (point-max))))))
-    (2 ;; APPEND
-     (process-put proc 'poke-vu-output
-                  (concat (process-get proc 'poke-vu-output) data)))
-    (5 ;; FINISH
+    (1 ;; ITER_BEGIN
+     )
+    (2 ;; ITER_END
      (when (buffer-live-p (process-buffer proc))
        (with-current-buffer (process-buffer proc)
          (let* ((inhibit-read-only t)
@@ -462,9 +455,16 @@ following attributes in its alist:
              (when offset
                (poke-vu-goto-byte offset))))))
      (process-put proc 'poke-vu-output ""))
-    (3 ;; HIGHLIGHT
-     )
-    (4 ;; FILTER
+    (3 ;; CLEAR
+     (when (buffer-live-p (process-buffer proc))
+       (with-current-buffer (process-buffer proc)
+         (let ((inhibit-read-only t))
+           (setq-local poke-vu-cur-pos (point))
+           (delete-region (point-min) (point-max))))))
+    (4 ;; APPEND
+     (process-put proc 'poke-vu-output
+                  (concat (process-get proc 'poke-vu-output) data)))
+    (5 ;; HIGHLIGHT
      )
     (_ ;; Protocol error
      (process-put proc 'pokelet-buf "")
